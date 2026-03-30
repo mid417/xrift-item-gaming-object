@@ -6,6 +6,7 @@ import {
   Color,
   Group,
   Mesh,
+  MeshBasicMaterial,
   MeshPhysicalMaterial,
   PointLight as ThreePointLight,
 } from 'three'
@@ -30,8 +31,7 @@ export const Item: React.FC<ItemProps> = ({ position = [0, 0, 0], scale = 1 }) =
   const crystalRef = useRef<Mesh>(null)
   const crystalMaterialRef = useRef<MeshPhysicalMaterial>(null)
   const auraMeshRefs = useRef<Array<Mesh | null>>([])
-  const auraMaterialRefs = useRef<Array<MeshPhysicalMaterial | null>>([])
-  const accentLightRefs = useRef<Array<ThreePointLight | null>>([])
+  const auraMaterialRefs = useRef<Array<MeshBasicMaterial | null>>([])
   const coreLightRef = useRef<ThreePointLight>(null)
   const underGlowRef = useRef<ThreePointLight>(null)
   const animatedCoreColor = useRef(new Color())
@@ -70,19 +70,6 @@ export const Item: React.FC<ItemProps> = ({ position = [0, 0, 0], scale = 1 }) =
       if (!material) return
 
       material.opacity = 0.16 + index * 0.012 + (Math.sin(elapsed * 4 + index) + 1) * 0.02
-      material.emissiveIntensity = 2.4 + Math.sin(elapsed * 3 + index) * 0.4
-    })
-
-    accentLightRefs.current.forEach((light, index) => {
-      if (!light) return
-
-      const angle = elapsed * 0.85 + index * ((Math.PI * 2) / RAINBOW_COLORS.length)
-      light.position.set(
-        Math.cos(angle) * 0.7,
-        0.85 + Math.sin(elapsed * 1.7 + index) * 0.18,
-        Math.sin(angle) * 0.7,
-      )
-      light.intensity = 0.9 + (Math.sin(elapsed * 3.2 + index) + 1) * 0.35
     })
 
     if (coreLightRef.current) {
@@ -127,10 +114,6 @@ export const Item: React.FC<ItemProps> = ({ position = [0, 0, 0], scale = 1 }) =
           emissiveIntensity={1.8}
           metalness={0.1}
           roughness={0.02}
-          transmission={0.1}
-          thickness={0.9}
-          clearcoat={1}
-          clearcoatRoughness={0.05}
           transparent
           opacity={0.72}
         />
@@ -145,18 +128,15 @@ export const Item: React.FC<ItemProps> = ({ position = [0, 0, 0], scale = 1 }) =
           position={[0, 0.8, 0]}
         >
           <octahedronGeometry args={[0.4]} />
-          <meshPhysicalMaterial
+          <meshBasicMaterial
             ref={(material) => {
               auraMaterialRefs.current[index] = material
             }}
             color={color}
-            emissive={color}
-            emissiveIntensity={2.4}
             transparent
             opacity={0.18}
             blending={AdditiveBlending}
             depthWrite={false}
-            toneMapped={false}
           />
         </mesh>
       ))}
@@ -168,8 +148,6 @@ export const Item: React.FC<ItemProps> = ({ position = [0, 0, 0], scale = 1 }) =
         intensity={6.5}
         distance={5.5}
         decay={1.6}
-        castShadow
-        shadow-bias={-0.0004}
       />
 
       <pointLight
@@ -181,18 +159,6 @@ export const Item: React.FC<ItemProps> = ({ position = [0, 0, 0], scale = 1 }) =
         decay={2}
       />
 
-      {RAINBOW_COLORS.map((color, index) => (
-        <pointLight
-          key={`${color.getHexString()}-light`}
-          ref={(light) => {
-            accentLightRefs.current[index] = light
-          }}
-          color={color}
-          intensity={1.2}
-          distance={2.6}
-          decay={2.2}
-        />
-      ))}
     </group>
   )
 }
