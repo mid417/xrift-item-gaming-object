@@ -1,13 +1,16 @@
-import { useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody } from '@react-three/rapier'
 import {
   AdditiveBlending,
   Color,
+  DynamicDrawUsage,
   Group,
+  InstancedMesh,
   Mesh,
   MeshBasicMaterial,
   MeshPhysicalMaterial,
+  Object3D,
   PointLight as ThreePointLight,
 } from 'three'
 
@@ -30,11 +33,26 @@ export const Item: React.FC<ItemProps> = ({ position = [0, 0, 0], scale = 1 }) =
   const groupRef = useRef<Group>(null)
   const crystalRef = useRef<Mesh>(null)
   const crystalMaterialRef = useRef<MeshPhysicalMaterial>(null)
-  const auraMeshRefs = useRef<Array<Mesh | null>>([])
-  const auraMaterialRefs = useRef<Array<MeshBasicMaterial | null>>([])
+  const auraRef = useRef<InstancedMesh>(null)
+  const auraMaterialRef = useRef<MeshBasicMaterial>(null)
+  const auraTransformRef = useRef(new Object3D())
   const coreLightRef = useRef<ThreePointLight>(null)
   const underGlowRef = useRef<ThreePointLight>(null)
   const animatedCoreColor = useRef(new Color())
+
+  useLayoutEffect(() => {
+    if (!auraRef.current) return
+
+    auraRef.current.instanceMatrix.setUsage(DynamicDrawUsage)
+
+    RAINBOW_COLORS.forEach((color, index) => {
+      auraRef.current?.setColorAt(index, color)
+    })
+
+    if (auraRef.current.instanceColor) {
+      auraRef.current.instanceColor.needsUpdate = true
+    }
+  }, [])
 
   useFrame((state, delta) => {
     const elapsed = state.clock.getElapsedTime()
@@ -51,26 +69,28 @@ export const Item: React.FC<ItemProps> = ({ position = [0, 0, 0], scale = 1 }) =
       crystalMaterialRef.current.emissiveIntensity = 1.8 + Math.sin(elapsed * 3.4) * 0.35
     }
 
-    auraMeshRefs.current.forEach((mesh, index) => {
-      if (!mesh) return
+    if (auraRef.current) {
+      const auraTransform = auraTransformRef.current
 
-      const angle = elapsed * (0.55 + index * 0.03) + index * ((Math.PI * 2) / RAINBOW_COLORS.length)
-      const wobble = Math.sin(elapsed * 2.8 + index) * 0.025
+      RAINBOW_COLORS.forEach((_, index) => {
+        const angle = elapsed * (0.55 + index * 0.03) + index * ((Math.PI * 2) / RAINBOW_COLORS.length)
+        const wobble = Math.sin(elapsed * 2.8 + index) * 0.025
 
-      mesh.rotation.x = angle * 0.35
-      mesh.rotation.y = -angle * 0.9
-      mesh.rotation.z = Math.sin(angle) * 0.25
-      mesh.position.set(Math.cos(angle) * 0.04, 0.8 + wobble, Math.sin(angle) * 0.04)
+        auraTransform.position.set(Math.cos(angle) * 0.04, 0.8 + wobble, Math.sin(angle) * 0.04)
+        auraTransform.rotation.set(angle * 0.35, -angle * 0.9, Math.sin(angle) * 0.25)
 
-      const scaleOffset = 1.02 + index * 0.035 + Math.sin(elapsed * 2 + index) * 0.015
-      mesh.scale.setScalar(scaleOffset)
-    })
+        const scaleOffset = 1.02 + index * 0.035 + Math.sin(elapsed * 2 + index) * 0.015
+        auraTransform.scale.setScalar(scaleOffset)
+        auraTransform.updateMatrix()
+        auraRef.current?.setMatrixAt(index, auraTransform.matrix)
+      })
 
-    auraMaterialRefs.current.forEach((material, index) => {
-      if (!material) return
+      auraRef.current.instanceMatrix.needsUpdate = true
+    }
 
-      material.opacity = 0.16 + index * 0.012 + (Math.sin(elapsed * 4 + index) + 1) * 0.02
-    })
+    if (auraMaterialRef.current) {
+      auraMaterialRef.current.opacity = 0.18 + (Math.sin(elapsed * 4) + 1) * 0.02
+    }
 
     if (coreLightRef.current) {
       const cycle = (elapsed * 0.9) % RAINBOW_COLORS.length
@@ -119,27 +139,18 @@ export const Item: React.FC<ItemProps> = ({ position = [0, 0, 0], scale = 1 }) =
         />
       </mesh>
 
-      {RAINBOW_COLORS.map((color, index) => (
-        <mesh
-          key={color.getHexString()}
-          ref={(mesh) => {
-            auraMeshRefs.current[index] = mesh
-          }}
-          position={[0, 0.8, 0]}
-        >
-          <octahedronGeometry args={[0.4]} />
-          <meshBasicMaterial
-            ref={(material) => {
-              auraMaterialRefs.current[index] = material
-            }}
-            color={color}
-            transparent
-            opacity={0.18}
-            blending={AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-      ))}
+      <instancedMesh ref={auraRef} args={[undefined, undefined, RAINBOW_COLORS.length]}>
+        <octahedronGeometry args={[0.4]} />
+        <meshBasicMaterial
+          ref={auraMaterialRef}
+          vertexColors
+          transparent
+          opacity={0.18}
+          blending={AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </instancedMesh>
 
       <pointLight
         ref={coreLightRef}
